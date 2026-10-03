@@ -8,7 +8,7 @@ st.set_page_config(page_title="Soul-Link 4P Tracker", layout="wide", page_icon="
 st.title("⚔️ Pokémon Unbound: Soul-Link Cuádruple")
 
 # Reemplaza con tu URL real de Firebase
-FIREBASE_URL = "https://TU-PROYECTO-rtdb.firebaseio.com"
+FIREBASE_URL = "https://soullink-unboundpokemon-default-rtdb.firebaseio.com"
 
 # Los 4 integrantes
 JUGADORES = ["abraham", "ruben", "jona", "juan"]
