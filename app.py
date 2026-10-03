@@ -1,89 +1,93 @@
 import streamlit as st
 import requests
-import pandas as pd
 import time
 
-st.set_page_config(page_title="Soul-Link 4P Tracker", layout="wide", page_icon="🔗")
+# Configuración visual de la página
+st.set_page_config(
+    page_title="Rastreador Soul-Link 4P",
+    page_icon="⚔️",
+    layout="wide"
+)
 
-st.title("⚔️ Pokémon Unbound: Soul-Link Cuádruple")
-
-# Reemplaza con tu URL real de Firebase
+# Conexión protegida mediante Secrets
 FIREBASE_URL = st.secrets["FIREBASE_URL"]
 
-# Los 4 integrantes
 JUGADORES = ["abraham", "ruben", "jona", "juan"]
 
-def cargar_datos_jugador(jugador):
+def obtener_datos_jugador(nombre):
+    """Consulta los datos de cada jugador en Firebase Realtime Database."""
     try:
-        r = requests.get(f"{FIREBASE_URL}/jugadores/{jugador}.json", timeout=2)
-        datos = r.json()
-        if isinstance(datos, list):
-            return datos
+        url = f"{FIREBASE_URL}/jugadores/{nombre}.json"
+        r = requests.get(url, timeout=3)
+        if r.status_code == 200 and r.json():
+            data = r.json()
+            # Si viene empaquetado dentro de la clave 'equipo'
+            if isinstance(data, dict) and "equipo" in data:
+                return data["equipo"]
+            # Si viene directamente como lista
+            elif isinstance(data, list):
+                return data
         return []
     except Exception:
         return []
 
-def cargar_muertes_globales():
+def obtener_rutas_caidas():
+    """Consulta la lista global de rutas caídas por Deathlink."""
     try:
-        r = requests.get(f"{FIREBASE_URL}/muertes.json", timeout=2)
-        datos = r.json()
-        if isinstance(datos, dict):
-            return datos
-        return {}
+        url = f"{FIREBASE_URL}/rutas_caidas.json"
+        r = requests.get(url, timeout=3)
+        if r.status_code == 200 and r.json():
+            data = r.json()
+            if isinstance(data, dict):
+                return list(data.keys())
+            elif isinstance(data, list):
+                return [x for x in data if x]
+        return []
     except Exception:
-        return {}
+        return []
 
-# 1. Resumen de Bajas Globales (Deathlink)
-muertes = cargar_muertes_globales()
-if muertes:
-    st.subheader("💀 Rutas Caídas (Deathlink)")
-    rutas_muertas = []
-    for r, meta in muertes.items():
-        if isinstance(meta, dict):
-            autor = meta.get('autor', 'Desconocido')
-        else:
-            autor = str(meta)
-        rutas_muertas.append(f"**{r}** (por {autor})")
-    st.error(" | ".join(rutas_muertas))
-st.divider()
+# Título principal
+st.title("⚔️ Pokémon Desatado: Cuádruple de Vínculo de Alma")
 
-# 2. Columnas en vivo para cada jugador
-columnas = st.columns(4)
+# Sección de Rutas Caídas (Deathlink)
+st.subheader("💀 Rutas Caídas (Deathlink)")
+rutas_caidas = obtener_rutas_caidas()
+
+if rutas_caidas:
+    st.error(f"**Rutas bloqueadas para todo el equipo:** {', '.join(rutas_caidas)}")
+else:
+    st.success("¡No hay bajas registradas todavía! Todas las rutas siguen disponibles.")
+
+st.markdown("---")
+
+# Tablero de columnas para los 4 jugadores
+cols = st.columns(4)
 
 for i, jugador in enumerate(JUGADORES):
-    with columnas[i]:
+    with cols[i]:
         st.subheader(jugador.capitalize())
-        datos = cargar_datos_jugador(jugador)
+        equipo = obtener_datos_jugador(jugador)
 
-        if not datos:
+        if not equipo:
             st.warning("Sin datos / Desconectado")
-            continue
-
-        equipo = []
-        fallos = []
-
-        for item in datos:
-            if not isinstance(item, dict):
-                continue
-            if item.get("tipo") == "fallo":
-                fallos.append(item.get("ruta", ""))
-            elif item.get("tipo") == "pokemon":
-                equipo.append({
-                    "Pokémon": item.get("nombre", "Desconocido"),
-                    "PS": item.get("hp", "0/0"),
-                    "Estado": "❤️ Vivo" if item.get("estado") == "Vivo" else "💀 Fainted",
-                    "Ruta": item.get("origen", "Desconocido")
-                })
-
-        if equipo:
-            df = pd.DataFrame(equipo)
-            st.dataframe(df, hide_index=True, use_container_width=True)
         else:
-            st.info("Equipo vacío")
+            for poke in equipo:
+                nombre = poke.get("nombre", "Desconocido")
+                hp_actual = poke.get("hp_actual", 0)
+                hp_max = poke.get("hp_max", 1)
+                estado = poke.get("estado", "Vivo")
+                ruta = poke.get("ruta", "Ruta desconocida")
 
-        if fallos:
-            st.caption(f"🚫 **Fallos:** {', '.join(fallos)}")
+                porcentaje = 0.0
+                if hp_max > 0:
+                    porcentaje = min(max(hp_actual / hp_max, 0.0), 1.0)
 
-# Refresco automático cada 3 segundos
+                # Tarjeta individual para cada Pokémon
+                with st.container(border=True):
+                    st.markdown(f"**{nombre}** ({estado})")
+                    st.caption(f"📍 {ruta}")
+                    st.progress(porcentaje, text=f"HP: {hp_actual} / {hp_max}")
+
+# Pausa breve antes de refrescar automáticamente
 time.sleep(3)
 st.rerun()
